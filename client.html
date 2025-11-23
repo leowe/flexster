@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Flexster — QR to Apple Music Player</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        margin: 0;
+        padding: 16px;
+        background: #f7f7f8;
+        color: #111;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 12px 0;
+      }
+      video {
+        width: 100%;
+        max-height: 360px;
+        background: #000;
+        border-radius: 6px;
+      }
+      .preview {
+        display: grid;
+        gap: 8px;
+      }
+      #result {
+        padding: 8px;
+        background: #fff;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+      button {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        background: white;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      input[type="text"] {
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        width: 360px;
+      }
+      .muted {
+        color: #666;
+        font-size: 13px;
+      }
+
+      /* Custom Player Styles */
+      #customPlayer {
+        margin-top: 20px;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: none; /* Hidden by default */
+        text-align: center;
+      }
+      #customPlayer.active {
+        display: block;
+      }
+      .player-controls {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .player-btn {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        border: none;
+        background: #fa2d48; /* Apple Music Red-ish */
+        color: white;
+        font-size: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+      .player-btn:active {
+        transform: scale(0.95);
+      }
+      .player-btn.stop {
+        background: #333;
+      }
+      #trackInfo {
+        font-weight: 600;
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
+      #artistInfo {
+        color: #666;
+        font-size: 16px;
+      }
+      .error-msg {
+        color: #d32f2f;
+        margin-top: 8px;
+      }
+
+      /* Hide metadata when not in developer mode */
+      .hide-metadata #trackInfo,
+      .hide-metadata #artistInfo {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Flexster — Scan QR → Play on Apple Music</h1>
+    </header>
+
+    <div class="controls">
+      <button id="startBtn">Start Camera</button>
+      <button id="stopBtn" disabled>Stop Camera</button>
+      <label style="display: inline-flex; align-items: center; gap: 8px"
+        ><input id="fileInput" type="file" accept="image/*" />Upload QR
+        image</label
+      >
+      <input
+        id="urlInput"
+        type="text"
+        placeholder="Paste Apple Music URL here"
+        aria-label="Apple Music URL"
+      />
+      <button id="playUrlBtn">Play URL</button>
+      <label
+        style="
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-left: 8px;
+        "
+        ><input id="devMode" type="checkbox" />Developer mode</label
+      >
+    </div>
+
+    <div class="preview">
+      <video id="video" playsinline></video>
+      <canvas id="canvas" style="display: none"></canvas>
+      <div id="result" aria-live="polite">
+        <div id="status" class="muted">No QR scanned yet.</div>
+        <div id="link"></div>
+      </div>
+    </div>
+
+    <!-- Custom Audio Player -->
+    <div id="customPlayer">
+      <div id="trackInfo">Track Title</div>
+      <div id="artistInfo">Artist Name</div>
+      <div class="player-controls">
+        <button id="playBtn" class="player-btn">▶</button>
+        <button id="stopPlayerBtn" class="player-btn stop">■</button>
+      </div>
+      <div id="playerStatus" class="muted" style="margin-top: 12px">Ready</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script>
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const statusEl = document.getElementById("status");
+      const linkEl = document.getElementById("link");
+      const devModeCheckbox = document.getElementById("devMode");
+      const fileInput = document.getElementById("fileInput");
+      const urlInput = document.getElementById("urlInput");
+      const playUrlBtn = document.getElementById("playUrlBtn");
+
+      // Player Elements
+      const customPlayer = document.getElementById("customPlayer");
+      const trackInfoEl = document.getElementById("trackInfo");
+      const artistInfoEl = document.getElementById("artistInfo");
+      const playBtn = document.getElementById("playBtn");
+      const stopPlayerBtn = document.getElementById("stopPlayerBtn");
+      const playerStatusEl = document.getElementById("playerStatus");
+
+      let stream = null;
+      let scanning = false;
+      let currentAudio = null;
+      let currentPreviewUrl = null;
+      let lastDetectedText = null;
+      let lastSource = null;
+
+      // --- Audio Player Logic ---
+
+      function updateMetadataVisibility() {
+        if (devModeCheckbox.checked) {
+          customPlayer.classList.remove("hide-metadata");
+        } else {
+          customPlayer.classList.add("hide-metadata");
+        }
+        updateLinkDisplay();
+      }
+
+      devModeCheckbox.addEventListener("change", updateMetadataVisibility);
+
+      function stopAudio() {
+        if (currentAudio) {
+          currentAudio.pause();
+          // We don't reset currentTime or nullify currentAudio so we can resume
+        }
+        playerStatusEl.textContent = "Paused";
+      }
+
+      function playAudio(url) {
+        // If we have an existing audio object for this URL, resume it
+        if (currentAudio && currentAudio.src === url) {
+          currentAudio
+            .play()
+            .then(() => {
+              playerStatusEl.textContent = "Playing...";
+            })
+            .catch((err) => {
+              console.error("Resume failed", err);
+              playerStatusEl.textContent = "Playback failed";
+            });
+          return;
+        }
+
+        // Otherwise stop previous and start new
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio = null;
+        }
+
+        currentAudio = new Audio(url);
+        currentAudio
+          .play()
+          .then(() => {
+            playerStatusEl.textContent = "Playing...";
+          })
+          .catch((err) => {
+            console.error("Playback failed", err);
+            playerStatusEl.textContent =
+              "Playback failed (interaction required?)";
+          });
+
+        currentAudio.addEventListener("ended", () => {
+          playerStatusEl.textContent = "Finished";
+        });
+      }
+
+      playBtn.addEventListener("click", () => {
+        if (currentPreviewUrl) {
+          playAudio(currentPreviewUrl);
+        }
+      });
+
+      stopPlayerBtn.addEventListener("click", () => {
+        stopAudio();
+      });
+
+      // --- Apple Music / iTunes API Logic ---
+
+      function extractTrackInfo(urlStr) {
+        try {
+          const url = new URL(urlStr);
+          if (!url.hostname.includes("music.apple.com")) return null;
+
+          // Path format: /<country>/album/<albumName>/<albumId>?i=<trackId>
+          // Example: /de/album/rolling-in-the-deep/403037872?i=403037877
+
+          const pathParts = url.pathname.split("/");
+          const country = pathParts[1]; // e.g., 'de'
+
+          // Track ID is usually in the 'i' query param
+          let trackId = url.searchParams.get("i");
+
+          // If no 'i' param, maybe it's a single track URL or we can try the last path component if it's numeric
+          // But usually for a song link, 'i' is present.
+
+          if (!trackId) {
+            // Fallback: check if the last part of path is the ID (sometimes happens for songs)
+            const lastPart = pathParts[pathParts.length - 1];
+            if (/^\d+$/.test(lastPart)) {
+              trackId = lastPart;
+            }
+          }
+
+          if (trackId && country) {
+            return { trackId, country };
+          }
+          return null;
+        } catch (e) {
+          console.error("Error parsing URL", e);
+          return null;
+        }
+      }
+
+      async function fetchAndSetupPlayer(trackId, country) {
+        // Reset player UI
+        customPlayer.classList.remove("active");
+        playerStatusEl.textContent = "Loading metadata...";
+
+        // Ensure metadata visibility is correct
+        updateMetadataVisibility();
+
+        try {
+          // Use JSONP or CORS proxy if needed?
+          // Actually iTunes API supports CORS.
+          const apiUrl = `https://itunes.apple.com/lookup?id=${trackId}&country=${country}`;
+
+          const response = await fetch(apiUrl);
+          const data = await response.json();
+
+          if (data.resultCount > 0) {
+            const track = data.results[0];
+
+            if (track.previewUrl) {
+              // Update UI
+              trackInfoEl.textContent = track.trackName || "Unknown Track";
+              artistInfoEl.textContent = track.artistName || "Unknown Artist";
+              currentPreviewUrl = track.previewUrl;
+
+              customPlayer.classList.add("active");
+              playerStatusEl.textContent = "Ready to play";
+
+              // Auto-play if possible (might be blocked by browser if no user interaction preceded)
+              playAudio(currentPreviewUrl);
+            } else {
+              statusEl.textContent = "No preview available for this track.";
+            }
+          } else {
+            statusEl.textContent = "Track not found in iTunes API.";
+          }
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = "Error fetching track info.";
+        }
+      }
+
+      // --- QR / Input Handling ---
+
+      function updateLinkDisplay() {
+        if (!lastDetectedText) return;
+
+        const devEnabled = devModeCheckbox.checked;
+        linkEl.innerHTML = "";
+
+        if (lastSource === "scan" && !devEnabled) {
+          statusEl.textContent = "QR detected (hidden) — processing...";
+        } else {
+          statusEl.textContent = "QR detected";
+          if (devEnabled) {
+            const a = document.createElement("a");
+            a.href = lastDetectedText;
+            a.textContent = lastDetectedText;
+            a.target = "_blank";
+            linkEl.appendChild(a);
+          }
+        }
+
+        const info = extractTrackInfo(lastDetectedText);
+        if (!info) {
+          const note = document.createElement("div");
+          note.className = "muted";
+          note.textContent = "Not a valid Apple Music track URL.";
+          linkEl.appendChild(note);
+        }
+      }
+
+      function handleDetected(text, source = "scan") {
+        lastDetectedText = text;
+        lastSource = source;
+
+        updateLinkDisplay();
+
+        const info = extractTrackInfo(text);
+        if (info) {
+          fetchAndSetupPlayer(info.trackId, info.country);
+        }
+      }
+
+      // --- Camera Logic ---
+
+      async function startCamera() {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" },
+          });
+          video.srcObject = stream;
+          await video.play();
+          scanning = true;
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          statusEl.textContent = "Scanning for QR codes…";
+          tick();
+        } catch (err) {
+          statusEl.textContent = "Camera error: " + err.message;
+        }
+      }
+
+      function stopCamera() {
+        scanning = false;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        statusEl.textContent = "Camera stopped.";
+        if (stream) {
+          stream.getTracks().forEach((t) => t.stop());
+          stream = null;
+        }
+        video.pause();
+        video.srcObject = null;
+      }
+
+      function tick() {
+        if (!scanning) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "attemptBoth",
+          });
+          if (code) {
+            handleDetected(code.data, "scan");
+            stopCamera();
+            return;
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+
+      // File upload fallback
+      fileInput.addEventListener("change", (ev) => {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = () => {
+          img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height
+            );
+            const code = jsQR(
+              imageData.data,
+              imageData.width,
+              imageData.height,
+              { inversionAttempts: "attemptBoth" }
+            );
+            if (code) handleDetected(code.data, "file");
+            else statusEl.textContent = "No QR detected in image.";
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(f);
+      });
+
+      // Manual URL input
+      playUrlBtn.addEventListener("click", () => {
+        const url = urlInput.value && urlInput.value.trim();
+        if (!url) return;
+        handleDetected(url, "manual");
+      });
+
+      startBtn.addEventListener("click", startCamera);
+      stopBtn.addEventListener("click", stopCamera);
+    </script>
+  </body>
+</html>
