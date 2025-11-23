@@ -397,6 +397,62 @@ class MusicFetcher:
                 
         return None
 
+    def fetch_openopus_epoch(self, composer: str) -> str | None:
+        """Fetch composer epoch (e.g. 'Romantic', 'Baroque') from OpenOpus."""
+        if not composer or composer == "Unknown Composer":
+            return None
+            
+        try:
+            # Clean up composer name
+            clean_composer = composer.split('(')[0].strip()
+            # Take last name if it's a full name, or just try the whole thing
+            # OpenOpus search is quite flexible
+            
+            url = f"https://api.openopus.org/composer/list/search/{clean_composer}.json"
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("status", {}).get("success") == "true" and data.get("composers"):
+                    # Return the epoch of the first match
+                    return data["composers"][0].get("epoch")
+        except Exception as e:
+            logger.warning(f"OpenOpus lookup error for '{composer}': {e}")
+        return None
+
+    def fetch_musicbrainz_tags(self, artist: str, title: str) -> list[str]:
+        """Fetch tags/genres from MusicBrainz for an artist/recording."""
+        tags = []
+        headers = {"User-Agent": "Flexster/0.1.0 ( contact@example.com )"}
+        
+        try:
+            # 1. Search for Artist to get artist tags (e.g. "Bebop" for Charlie Parker)
+            if artist and artist != "Unknown Artist":
+                # Clean artist name
+                clean_artist = artist.split(',')[0].split('&')[0].strip()
+                query = f'artist:"{clean_artist}"'
+                
+                time.sleep(1.1)
+                response = requests.get("https://musicbrainz.org/ws/2/artist", params={"query": query, "fmt": "json", "limit": 1}, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("artists"):
+                        artist_obj = data["artists"][0]
+                        # Collect tags
+                        for tag in artist_obj.get("tags", []):
+                            if int(tag.get("count", 0)) > 0:
+                                tags.append(tag["name"])
+                        # Collect genres if available (MB specific)
+                        for genre in artist_obj.get("genres", []):
+                             tags.append(genre["name"])
+
+            # 2. Search for Recording to get specific tags
+            # (This might be redundant if we already did it in fetch_work_details, but let's keep it separate for now or integrate)
+            
+        except Exception as e:
+            logger.warning(f"MB tag lookup error: {e}")
+            
+        return list(set(tags)) # Deduplicate
+
     def fetch_metadata(self, query: str):
         params = {
             "term": query,
@@ -422,6 +478,7 @@ class MusicFetcher:
             artist = result.get("artistName", "Unknown Artist")
             
             composer = result.get("composer")
+            primary_genre = result.get("primaryGenreName", "Unknown Genre")
 
             # Always try MusicBrainz to verify classical works and get a composition year
             mb_data = self.fetch_work_details_from_mb(title, artist, original_query=query)
@@ -441,6 +498,33 @@ class MusicFetcher:
             if not composition_year:
                 composition_year = self.fetch_composition_year_from_wikidata(title, final_composer or artist)
 
+            # --- Subgenre / Style Lookup ---
+            subgenre = None
+            
+            # Strategy 1: OpenOpus for Classical
+            if primary_genre == "Classical" or (final_composer and "Symphony" in title):
+                epoch = self.fetch_openopus_epoch(final_composer)
+                if epoch:
+                    subgenre = epoch
+
+            # Strategy 2: MusicBrainz Tags for Jazz/Rock/etc (or if OpenOpus failed)
+            if not subgenre and primary_genre != "Classical":
+                tags = self.fetch_musicbrainz_tags(artist, title)
+                # Filter tags to find something that looks like a subgenre
+                # This is heuristic. We might just take the most popular tag that isn't the genre itself.
+                # Common subgenres: Bebop, Hard Bop, Swing, Alternative Rock, etc.
+                
+                # Simple heuristic: take the first tag that is not the primary genre
+                for tag in tags:
+                    if tag.lower() != primary_genre.lower():
+                        subgenre = tag.title()
+                        break
+            
+            # Format genre string
+            display_genre = primary_genre
+            if subgenre:
+                display_genre = f"{primary_genre} ({subgenre})"
+
             # Fetch Spotify metadata only if credentials are configured
             spotify_link = ""
             if self.spotify_client_id and self.spotify_client_id != "YOUR_SPOTIFY_CLIENT_ID":
@@ -458,7 +542,7 @@ class MusicFetcher:
                 "year": composition_year or recording_year,
                 "recording_year": recording_year,
                 "composition_year": composition_year or "",
-                "genre": result.get("primaryGenreName", "Unknown Genre"),
+                "genre": display_genre,
                 "apple_link": result.get("trackViewUrl", ""),
                 "spotify_link": spotify_link
             }

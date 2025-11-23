@@ -1,0 +1,13 @@
+{
+  "_comment": "Get your Spotify API credentials at https://developer.spotify.com/dashboard",
+  "_instructions": [
+    "1. Go to https://developer.spotify.com/dashboard",
+    "2. Log in with your Spotify account (free, no premium needed)",
+    "3. Click 'Create app'",
+    "4. Fill in: App name: 'Flexster', App description: 'Music flashcards', Redirect URI: http://localhost (just for form completion)",
+    "5. Accept terms and create",
+    "6. Copy your Client ID and Client Secret here"
+  ],
+  "client_id": "YOUR_SPOTIFY_CLIENT_ID",
+  "client_secret": "YOUR_SPOTIFY_CLIENT_SECRET"
+}

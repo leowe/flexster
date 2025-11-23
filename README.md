@@ -1,18 +1,31 @@
 ++ README.md
 
-# Flexster — QR to Apple Music Player
+# Flexster — QR to Music Player
 
-This is a small static web page that scans QR codes (camera or image upload), extracts Apple Music URLs, and plays them inline using Apple's embed player so you don't have to leave the page.
+This is a web application that scans QR codes (camera or image upload), extracts Apple Music or Spotify URLs, and plays them inline using either platform's player.
+
+## Features
+
+- **QR Code Scanner**: Scan QR codes from camera or uploaded images
+- **Multi-Platform Support**: Works with both Apple Music and Spotify
+- **Spotify Web Playback SDK**: Full playback control with Spotify Premium
+- **Apple Music Embed**: Play Apple Music previews (30s) or full embed player
+- **Privacy Mode**: Developer mode to hide/show scanned URLs
 
 ## Files
 
-- `client.html` — the web UI: camera scanner, file upload, manual URL input, and an embed player.
-- `qr_generator.py` — (provided) a small Python script to create QR code PNG files.
+- `index.html` — the web UI: camera scanner, file upload, manual URL input, and music players
+- `qr_generator.py` — Python script to create QR code PNG files
+- `main.py` — CLI tool to generate music flashcards with QR codes
+- `music_fetcher.py` — Fetches metadata from iTunes and MusicBrainz APIs
+- `pdf_generator.py` — Generates printable PDF flashcards
+- `spotify_config.json` — Spotify API credentials (you need to configure this)
 
 ## How it works
 
-- The page uses `jsQR` (from CDN) to decode QR codes from the camera stream or uploaded images.
-- If a scanned URL is from `music.apple.com`, the page converts it to the Apple embed host `embed.music.apple.com` and inserts an `<iframe>` player.
+- The page uses `jsQR` (from CDN) to decode QR codes from the camera stream or uploaded images
+- **Apple Music**: Converts URLs to embed format or uses 30s preview API
+- **Spotify**: Uses Web Playback SDK for full playback control (requires Premium + login)
 
 ## Deployment
 
@@ -68,20 +81,49 @@ This will generate `music_cards.pdf` in the current directory.
 - `pdf_generator.py`: Generates the PDF flashcards.
 - `client.html`: The web player interface.
 
-## Run locally
+## Setup for Spotify Web Playback
 
-Open a terminal in the project folder and start a static HTTP server. On macOS, `python3`'s simple server works and `localhost` is treated as a secure context so camera access works.
+To use Spotify's full playback features:
+
+### 1. Configure Spotify App
+
+1. Go to <https://developer.spotify.com/dashboard>
+2. Log in with your Spotify account
+3. Click "Create app"
+4. Fill in:
+   - **App name**: Flexster
+   - **App description**: Music flashcards player
+   - **Redirect URI**: `https://127.0.0.1:8000/`
+5. Accept terms and click "Create"
+6. Copy your **Client ID** to `spotify_config.json`
+7. **Add your user**: Click "Settings" → scroll to "User Management" → "Add new user" → enter your Spotify email
+8. **Important**: In the app settings, make sure the Redirect URI is exactly: `https://127.0.0.1:8000/`
+9. Click "Save"
+
+### 2. Run HTTPS Server
+
+Spotify Web Playback SDK requires HTTPS. Use the included HTTPS server:
 
 ```bash
 cd /path/to/flexster
-python3 -m http.server 8000
-# then open http://localhost:8000/client.html in your browser
+python3 https_server.py
 ```
 
-Notes:
+This will automatically generate a self-signed certificate and start the server at `https://127.0.0.1:8000`
 
-- Use a Chromium-based browser or recent Safari. You will be prompted to allow camera access.
-- If camera permission is blocked, use the "Upload QR image" control or paste the Apple Music URL.
+### 3. Login to Spotify
+
+1. Click "Login with Spotify"
+2. Authorize the app
+3. You'll be redirected back with full playback controls
+
+**Note**: Spotify Web Playback SDK requires a **Spotify Premium** account.
+
+### Browser Notes
+
+- Use a Chromium-based browser or recent Safari for camera access
+- You will be prompted to allow camera access
+- If camera permission is blocked, use the "Upload QR image" control or paste the music URL
 
 ## Generate a QR for testing
 
@@ -111,7 +153,26 @@ If you want, I can:
 - Add a small Node/Flask dev server to serve the page and static assets.
 - Add a demo QR image into the repository.
 
-Developer mode and metadata hiding
+## Configuration Options
 
-- The page includes a **Developer mode** checkbox. For privacy, QR links detected from the camera or uploaded images are only revealed when Developer mode is enabled. This prevents the page from automatically showing scanned links unless you opt in.
-- By default the Apple Music embed is cropped to hide the cover image, artist, and other metadata; click **Show Full Embed** to reveal the full player including artwork.
+### Developer Mode
+
+- The page includes a **Developer mode** checkbox
+- For privacy, QR links detected from the camera or uploaded images are only revealed when Developer mode is enabled
+- This prevents the page from automatically showing scanned links unless you opt in
+
+### Player Options
+
+- **Use Embed Player**: Switch between custom player (30s preview) and full embed player
+- **Spotify Authentication**: Login required for full Spotify playback with Web Playback SDK
+- **Apple Music**: Works without authentication (30s previews or embed player)
+
+## Platform Comparison
+
+| Feature          | Apple Music     | Spotify               |
+| ---------------- | --------------- | --------------------- |
+| Preview Playback | ✅ 30s previews | ❌ Requires login     |
+| Full Playback    | ✅ Embed player | ✅ Web Playback SDK   |
+| Authentication   | ❌ Not required | ✅ Required (Premium) |
+| Offline          | ❌              | ❌                    |
+| Custom Controls  | ✅ Play/Stop    | ✅ Play/Pause/Stop    |

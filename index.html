@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Flexster — QR to Apple Music Player</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        margin: 0;
+        padding: 16px;
+        background: #f7f7f8;
+        color: #111;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 12px 0;
+      }
+      video {
+        width: 100%;
+        max-height: 360px;
+        background: #000;
+        border-radius: 6px;
+      }
+      .preview {
+        display: grid;
+        gap: 8px;
+      }
+      #result {
+        padding: 8px;
+        background: #fff;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+      button {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        background: white;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      input[type="text"] {
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        width: 360px;
+      }
+      .muted {
+        color: #666;
+        font-size: 13px;
+      }
+
+      /* Custom Player Styles */
+      #customPlayer {
+        margin-top: 20px;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        display: none; /* Hidden by default */
+        text-align: center;
+      }
+      #customPlayer.active {
+        display: block;
+      }
+      .player-controls {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .player-btn {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        border: none;
+        background: #fa2d48; /* Apple Music Red-ish */
+        color: white;
+        font-size: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+      .player-btn:active {
+        transform: scale(0.95);
+      }
+      .player-btn.stop {
+        background: #333;
+      }
+      #trackInfo {
+        font-weight: 600;
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
+      #artistInfo {
+        color: #666;
+        font-size: 16px;
+      }
+      .error-msg {
+        color: #d32f2f;
+        margin-top: 8px;
+      }
+
+      /* Hide metadata when not in developer mode */
+      .hide-metadata #trackInfo,
+      .hide-metadata #artistInfo {
+        display: none;
+      }
+
+      /* Spotify Auth Styles */
+      .auth-section {
+        margin: 12px 0;
+        padding: 12px;
+        background: #1db954;
+        color: white;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .auth-section button {
+        background: white;
+        color: #1db954;
+        font-weight: 600;
+        border: none;
+      }
+      .auth-section.logged-in {
+        background: #1ed760;
+      }
+      .auth-section.hidden {
+        display: none;
+      }
+      #spotifyStatus {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Flexster — Scan QR → Play Music</h1>
+    </header>
+
+    <!-- Spotify Authentication Section -->
+    <div id="authSection" class="auth-section">
+      <div id="spotifyStatus">
+        Login with Spotify Premium to enable full playback
+      </div>
+      <button id="loginBtn">Login with Spotify</button>
+      <button id="logoutBtn" style="display: none">Logout</button>
+    </div>
+
+    <div class="controls">
+      <button id="startBtn">Start Camera</button>
+      <button id="stopBtn" disabled>Stop Camera</button>
+      <label style="display: inline-flex; align-items: center; gap: 8px"
+        ><input id="fileInput" type="file" accept="image/*" />Upload QR
+        image</label
+      >
+      <input
+        id="urlInput"
+        type="text"
+        placeholder="Paste Apple Music URL here"
+        aria-label="Apple Music URL"
+      />
+      <button id="playUrlBtn">Play URL</button>
+      <label
+        style="
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-left: 8px;
+        "
+        ><input id="useEmbed" type="checkbox" />Use Embed Player</label
+      >
+      <label
+        style="
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-left: 8px;
+        "
+        ><input id="devMode" type="checkbox" />Developer mode</label
+      >
+    </div>
+
+    <div class="preview">
+      <video id="video" playsinline></video>
+      <canvas id="canvas" style="display: none"></canvas>
+      <div id="result" aria-live="polite">
+        <div id="status" class="muted">No QR scanned yet.</div>
+        <div id="link"></div>
+      </div>
+    </div>
+
+    <!-- Custom Audio Player -->
+    <div id="customPlayer">
+      <div id="trackInfo">Track Title</div>
+      <div id="artistInfo">Artist Name</div>
+      <div class="player-controls">
+        <button id="playBtn" class="player-btn">▶</button>
+        <button id="stopPlayerBtn" class="player-btn stop">■</button>
+      </div>
+      <div id="playerStatus" class="muted" style="margin-top: 12px">Ready</div>
+    </div>
+
+    <!-- Embed Player Container -->
+    <div id="embedPlayer" style="display: none; margin-top: 20px">
+      <iframe
+        id="embedFrame"
+        allow="autoplay *; encrypted-media *; fullscreen *; clipboard-write"
+        frameborder="0"
+        height="175"
+        style="
+          width: 100%;
+          max-width: 660px;
+          overflow: hidden;
+          background: transparent;
+        "
+        sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation"
+        src=""
+      ></iframe>
+    </div>
+
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script>
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const statusEl = document.getElementById("status");
+      const linkEl = document.getElementById("link");
+      const devModeCheckbox = document.getElementById("devMode");
+      const fileInput = document.getElementById("fileInput");
+      const urlInput = document.getElementById("urlInput");
+      const playUrlBtn = document.getElementById("playUrlBtn");
+      const useEmbedCheckbox = document.getElementById("useEmbed");
+
+      // Player Elements
+      const customPlayer = document.getElementById("customPlayer");
+      const embedPlayer = document.getElementById("embedPlayer");
+      const embedFrame = document.getElementById("embedFrame");
+      const trackInfoEl = document.getElementById("trackInfo");
+      const artistInfoEl = document.getElementById("artistInfo");
+      const playBtn = document.getElementById("playBtn");
+      const stopPlayerBtn = document.getElementById("stopPlayerBtn");
+      const playerStatusEl = document.getElementById("playerStatus");
+
+      let stream = null;
+      let scanning = false;
+      let currentAudio = null;
+      let currentPreviewUrl = null;
+      let lastDetectedText = null;
+      let lastSource = null;
+
+      // Spotify Web Playback SDK variables
+      let spotifyPlayer = null;
+      let spotifyDeviceId = null;
+      let spotifyAccessToken = null;
+      let currentSpotifyTrackUri = null;
+
+      // Auth UI elements
+      const authSection = document.getElementById("authSection");
+      const spotifyStatus = document.getElementById("spotifyStatus");
+      const loginBtn = document.getElementById("loginBtn");
+      const logoutBtn = document.getElementById("logoutBtn");
+
+      // --- Spotify Authentication with PKCE ---
+
+      function generateRandomString(length) {
+        const possible =
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        const values = crypto.getRandomValues(new Uint8Array(length));
+        return values.reduce(
+          (acc, x) => acc + possible[x % possible.length],
+          ""
+        );
+      }
+
+      async function sha256(plain) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(plain);
+        return window.crypto.subtle.digest("SHA-256", data);
+      }
+
+      function base64encode(input) {
+        return btoa(String.fromCharCode(...new Uint8Array(input)))
+          .replace(/=/g, "")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_");
+      }
+
+      async function checkSpotifyAuth() {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+
+        if (code) {
+          console.log("Authorization code received, exchanging for token");
+          const verifier = localStorage.getItem("code_verifier");
+
+          if (!verifier) {
+            console.error("No code verifier found");
+            return;
+          }
+
+          await exchangeCodeForToken(code, verifier);
+
+          // Clean up URL
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+        } else {
+          // Check if we have a stored token
+          const storedToken = localStorage.getItem("spotify_access_token");
+          if (storedToken) {
+            console.log("Using stored token");
+            spotifyAccessToken = storedToken;
+            initSpotifyPlayer();
+          }
+        }
+      }
+
+      async function exchangeCodeForToken(code, codeVerifier) {
+        const clientId = "d59b50211d83413eab5913055f986c43";
+        const redirectUri = window.location.origin + window.location.pathname;
+
+        const params = new URLSearchParams({
+          client_id: clientId,
+          grant_type: "authorization_code",
+          code: code,
+          redirect_uri: redirectUri,
+          code_verifier: codeVerifier,
+        });
+
+        try {
+          const response = await fetch(
+            "https://accounts.spotify.com/api/token",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: params,
+            }
+          );
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error_description || "Token exchange failed");
+          }
+
+          const data = await response.json();
+          spotifyAccessToken = data.access_token;
+          localStorage.setItem("spotify_access_token", spotifyAccessToken);
+
+          // Store refresh token if provided
+          if (data.refresh_token) {
+            localStorage.setItem("spotify_refresh_token", data.refresh_token);
+          }
+
+          console.log("Token received successfully");
+          console.log("Token scopes:", data.scope);
+          console.log(
+            "Token starts with:",
+            spotifyAccessToken?.substring(0, 20)
+          );
+          initSpotifyPlayer();
+        } catch (error) {
+          console.error("Error exchanging code for token:", error);
+          playerStatusEl.textContent =
+            "Authentication failed: " + error.message;
+        } finally {
+          localStorage.removeItem("code_verifier");
+        }
+      }
+
+      async function spotifyLogin() {
+        const clientId = "d59b50211d83413eab5913055f986c43";
+        const redirectUri = window.location.origin + window.location.pathname;
+
+        // Generate code verifier and challenge for PKCE
+        const codeVerifier = generateRandomString(64);
+        const hashed = await sha256(codeVerifier);
+        const codeChallenge = base64encode(hashed);
+
+        // Store verifier for later use
+        localStorage.setItem("code_verifier", codeVerifier);
+
+        const scopes = [
+          "streaming",
+          "user-read-email",
+          "user-read-private",
+          "user-modify-playback-state",
+          "user-read-playback-state",
+        ].join(" ");
+
+        const authUrl = new URL("https://accounts.spotify.com/authorize");
+        authUrl.searchParams.append("client_id", clientId);
+        authUrl.searchParams.append("response_type", "code");
+        authUrl.searchParams.append("redirect_uri", redirectUri);
+        authUrl.searchParams.append("scope", scopes);
+        authUrl.searchParams.append("code_challenge_method", "S256");
+        authUrl.searchParams.append("code_challenge", codeChallenge);
+
+        console.log("Redirect URI being sent:", redirectUri);
+        console.log("Full auth URL:", authUrl.toString());
+
+        window.location.href = authUrl.toString();
+      }
+
+      function spotifyLogout() {
+        if (spotifyPlayer) {
+          spotifyPlayer.disconnect();
+          spotifyPlayer = null;
+        }
+        spotifyAccessToken = null;
+        spotifyDeviceId = null;
+        localStorage.removeItem("spotify_access_token");
+        updateAuthUI(false);
+      }
+
+      function updateAuthUI(loggedIn) {
+        if (loggedIn) {
+          spotifyStatus.textContent = "✓ Connected to Spotify Premium";
+          authSection.classList.add("logged-in");
+          loginBtn.style.display = "none";
+          logoutBtn.style.display = "block";
+        } else {
+          spotifyStatus.textContent =
+            "Login with Spotify Premium to enable full playback";
+          authSection.classList.remove("logged-in");
+          loginBtn.style.display = "block";
+          logoutBtn.style.display = "none";
+        }
+      }
+
+      loginBtn.addEventListener("click", spotifyLogin);
+      logoutBtn.addEventListener("click", spotifyLogout);
+
+      // Initialize Spotify Player
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        console.log("Spotify SDK ready");
+        if (spotifyAccessToken) {
+          initSpotifyPlayer();
+        }
+      };
+
+      function initSpotifyPlayer() {
+        if (!spotifyAccessToken) return;
+
+        // Check if SDK is loaded
+        if (typeof Spotify === "undefined") {
+          console.log("Spotify SDK not loaded yet, waiting...");
+          return;
+        }
+
+        spotifyPlayer = new Spotify.Player({
+          name: "Flexster Web Player",
+          getOAuthToken: (cb) => {
+            cb(spotifyAccessToken);
+          },
+          volume: 0.8,
+        });
+
+        // Ready
+        spotifyPlayer.addListener("ready", ({ device_id }) => {
+          console.log("Ready with Device ID", device_id);
+          spotifyDeviceId = device_id;
+          updateAuthUI(true);
+          playerStatusEl.textContent = "Spotify player ready";
+        });
+
+        // Not Ready
+        spotifyPlayer.addListener("not_ready", ({ device_id }) => {
+          console.log("Device ID has gone offline", device_id);
+        });
+
+        // Player state changed
+        spotifyPlayer.addListener("player_state_changed", (state) => {
+          if (!state) return;
+
+          const track = state.track_window.current_track;
+          trackInfoEl.textContent = track.name;
+          artistInfoEl.textContent = track.artists
+            .map((a) => a.name)
+            .join(", ");
+
+          if (state.paused) {
+            playerStatusEl.textContent = "Paused";
+          } else {
+            playerStatusEl.textContent = "Playing...";
+          }
+        });
+
+        // Error handling
+        spotifyPlayer.addListener("initialization_error", ({ message }) => {
+          console.error("Initialization Error", message);
+          playerStatusEl.textContent = "Error: " + message;
+        });
+
+        spotifyPlayer.addListener("authentication_error", ({ message }) => {
+          console.error("Authentication Error", message);
+          localStorage.removeItem("spotify_access_token");
+          updateAuthUI(false);
+          playerStatusEl.textContent =
+            "Authentication failed. Please login again.";
+        });
+
+        spotifyPlayer.addListener("account_error", ({ message }) => {
+          console.error("Account Error", message);
+          playerStatusEl.textContent = "Error: Spotify Premium required";
+        });
+
+        spotifyPlayer.addListener("playback_error", ({ message }) => {
+          console.error("Playback Error", message);
+          playerStatusEl.textContent = "Playback error: " + message;
+        });
+
+        // Connect to the player
+        spotifyPlayer.connect();
+      }
+
+      // Check for auth on page load
+      checkSpotifyAuth();
+
+      // --- Audio Player Logic ---
+
+      function updateMetadataVisibility() {
+        if (devModeCheckbox.checked) {
+          customPlayer.classList.remove("hide-metadata");
+        } else {
+          customPlayer.classList.add("hide-metadata");
+        }
+        updateLinkDisplay();
+      }
+
+      devModeCheckbox.addEventListener("change", updateMetadataVisibility);
+
+      function stopAudio() {
+        if (currentAudio) {
+          currentAudio.pause();
+          // We don't reset currentTime or nullify currentAudio so we can resume
+        }
+        playerStatusEl.textContent = "Paused";
+      }
+
+      function playAudio(url) {
+        // If we have an existing audio object for this URL, resume it
+        if (currentAudio && currentAudio.src === url) {
+          currentAudio
+            .play()
+            .then(() => {
+              playerStatusEl.textContent = "Playing...";
+            })
+            .catch((err) => {
+              console.error("Resume failed", err);
+              playerStatusEl.textContent = "Playback failed";
+            });
+          return;
+        }
+
+        // Otherwise stop previous and start new
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio = null;
+        }
+
+        currentAudio = new Audio(url);
+        currentAudio
+          .play()
+          .then(() => {
+            playerStatusEl.textContent = "Playing...";
+          })
+          .catch((err) => {
+            console.error("Playback failed", err);
+            playerStatusEl.textContent =
+              "Playback failed (interaction required?)";
+          });
+
+        currentAudio.addEventListener("ended", () => {
+          playerStatusEl.textContent = "Finished";
+        });
+      }
+
+      async function playSpotifyTrack(trackUri) {
+        if (!spotifyDeviceId || !spotifyAccessToken) {
+          playerStatusEl.textContent = "Please login to Spotify Premium first";
+          return;
+        }
+
+        currentSpotifyTrackUri = trackUri;
+
+        try {
+          const response = await fetch(
+            `https://api.spotify.com/v1/me/player/play?device_id=${spotifyDeviceId}`,
+            {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${spotifyAccessToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                uris: [trackUri],
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error.message || "Playback failed");
+          }
+
+          playerStatusEl.textContent = "Playing...";
+        } catch (err) {
+          console.error("Spotify playback error", err);
+          playerStatusEl.textContent = "Error: " + err.message;
+        }
+      }
+
+      function toggleSpotifyPlayback() {
+        if (!spotifyPlayer) {
+          playerStatusEl.textContent = "Spotify player not ready";
+          return;
+        }
+
+        spotifyPlayer.togglePlay().then(() => {
+          console.log("Toggled playback");
+        });
+      }
+
+      playBtn.addEventListener("click", () => {
+        if (currentSpotifyTrackUri) {
+          // Playing Spotify track
+          if (spotifyPlayer) {
+            toggleSpotifyPlayback();
+          }
+        } else if (currentPreviewUrl) {
+          // Playing Apple Music preview
+          playAudio(currentPreviewUrl);
+        }
+      });
+
+      stopPlayerBtn.addEventListener("click", () => {
+        if (currentSpotifyTrackUri) {
+          // Stop Spotify track
+          if (spotifyPlayer) {
+            spotifyPlayer.pause().then(() => {
+              playerStatusEl.textContent = "Stopped";
+            });
+          }
+        } else if (currentPreviewUrl) {
+          // Stop Apple Music preview
+          stopAudio();
+        }
+      });
+
+      // --- Apple Music / iTunes API Logic ---
+
+      function detectPlatform(urlStr) {
+        try {
+          const url = new URL(urlStr);
+          if (url.hostname.includes("music.apple.com")) {
+            return "apple";
+          } else if (
+            url.hostname.includes("spotify.com") ||
+            url.hostname.includes("spotify")
+          ) {
+            return "spotify";
+          }
+          return null;
+        } catch (e) {
+          console.error("Error parsing URL", e);
+          return null;
+        }
+      }
+
+      function extractTrackInfo(urlStr) {
+        const platform = detectPlatform(urlStr);
+
+        if (platform === "apple") {
+          return extractAppleTrackInfo(urlStr);
+        } else if (platform === "spotify") {
+          return extractSpotifyTrackInfo(urlStr);
+        }
+        return null;
+      }
+
+      function extractAppleTrackInfo(urlStr) {
+        try {
+          const url = new URL(urlStr);
+          if (!url.hostname.includes("music.apple.com")) return null;
+
+          // Path format: /<country>/album/<albumName>/<albumId>?i=<trackId>
+          // Example: /de/album/rolling-in-the-deep/403037872?i=403037877
+
+          const pathParts = url.pathname.split("/");
+          const country = pathParts[1]; // e.g., 'de'
+
+          // Track ID is usually in the 'i' query param
+          let trackId = url.searchParams.get("i");
+
+          // If no 'i' param, maybe it's a single track URL or we can try the last path component if it's numeric
+          // But usually for a song link, 'i' is present.
+
+          if (!trackId) {
+            // Fallback: check if the last part of path is the ID (sometimes happens for songs)
+            const lastPart = pathParts[pathParts.length - 1];
+            if (/^\d+$/.test(lastPart)) {
+              trackId = lastPart;
+            }
+          }
+
+          if (trackId && country) {
+            return { platform: "apple", trackId, country };
+          }
+          return null;
+        } catch (e) {
+          console.error("Error parsing Apple Music URL", e);
+          return null;
+        }
+      }
+
+      function extractSpotifyTrackInfo(urlStr) {
+        try {
+          const url = new URL(urlStr);
+          // Spotify URL format: https://open.spotify.com/track/<trackId>
+          const pathParts = url.pathname.split("/");
+
+          const trackIndex = pathParts.indexOf("track");
+          if (trackIndex !== -1 && pathParts[trackIndex + 1]) {
+            const trackId = pathParts[trackIndex + 1].split("?")[0]; // Remove query params
+            return { platform: "spotify", trackId };
+          }
+          return null;
+        } catch (e) {
+          console.error("Error parsing Spotify URL", e);
+          return null;
+        }
+      }
+
+      async function fetchAndSetupPlayer(info) {
+        if (!info) return;
+
+        // Reset player UI and state
+        customPlayer.classList.remove("active");
+        embedPlayer.style.display = "none";
+        playerStatusEl.textContent = "Loading metadata...";
+
+        // Clear state based on platform
+        if (info.platform === "spotify") {
+          // Clear Apple Music state when switching to Spotify
+          currentPreviewUrl = null;
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio = null;
+          }
+        } else if (info.platform === "apple") {
+          // Clear Spotify state when switching to Apple Music
+          currentSpotifyTrackUri = null;
+          if (spotifyPlayer) {
+            spotifyPlayer.pause();
+          }
+        }
+
+        // Ensure metadata visibility is correct
+        updateMetadataVisibility();
+
+        if (info.platform === "spotify") {
+          await setupSpotifyPlayer(info);
+        } else if (info.platform === "apple") {
+          await setupApplePlayer(info);
+        }
+      }
+
+      async function setupSpotifyPlayer(info) {
+        const { trackId } = info;
+
+        // Check if Embed Mode is enabled
+        if (useEmbedCheckbox.checked) {
+          // Use Spotify Embed
+          const embedUrl = `https://open.spotify.com/embed/track/${trackId}`;
+          embedFrame.src = embedUrl;
+          embedPlayer.style.display = "block";
+          statusEl.textContent = "Loaded in Spotify Embed Player.";
+          customPlayer.classList.remove("active");
+          return;
+        }
+
+        // Check if user is authenticated with Spotify Premium
+        if (spotifyPlayer && spotifyDeviceId) {
+          // Use Web Playback SDK
+          try {
+            const response = await fetch(
+              `https://api.spotify.com/v1/tracks/${trackId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${spotifyAccessToken}`,
+                },
+              }
+            );
+
+            console.log("Spotify API response status:", response.status);
+
+            if (response.ok) {
+              const track = await response.json();
+              trackInfoEl.textContent = track.name;
+              artistInfoEl.textContent = track.artists
+                .map((a) => a.name)
+                .join(", ");
+
+              const trackUri = `spotify:track:${trackId}`;
+              customPlayer.classList.add("active");
+              playerStatusEl.textContent = "Ready to play";
+
+              // Auto-play the track
+              await playSpotifyTrack(trackUri);
+            } else {
+              // Try to parse error as text first
+              const errorText = await response.text();
+              console.error("Spotify API error:", response.status, errorText);
+
+              try {
+                const errorData = JSON.parse(errorText);
+                throw new Error(
+                  `${response.status}: ${
+                    errorData.error?.message || "Failed to fetch track info"
+                  }`
+                );
+              } catch (jsonError) {
+                throw new Error(
+                  `${response.status}: ${
+                    errorText || "Failed to fetch track info"
+                  }`
+                );
+              }
+            }
+          } catch (err) {
+            console.error("Full error:", err);
+            statusEl.textContent =
+              "Error loading Spotify track: " + err.message;
+          }
+        } else {
+          // Not authenticated - show login prompt
+          statusEl.textContent =
+            "Login with Spotify Premium for full playback, or enable 'Use Embed Player'.";
+          const note = document.createElement("div");
+          note.className = "muted";
+          note.textContent =
+            "Click 'Login with Spotify' above for full playback control.";
+          linkEl.appendChild(note);
+        }
+      }
+
+      async function setupApplePlayer(info) {
+        const { trackId, country } = info;
+
+        // Check if Embed Mode is enabled
+        if (useEmbedCheckbox.checked) {
+          // Construct Embed URL
+          // Format: https://embed.music.apple.com/<country>/album/<albumId>?i=<trackId>
+          // We need to fetch the album ID first because the trackId alone isn't enough for the embed URL structure usually,
+          // although sometimes it works. Let's fetch metadata to be sure.
+
+          try {
+            const apiUrl = `https://itunes.apple.com/lookup?id=${trackId}&country=${country}`;
+            // Use CORS proxy for HTTPS requests
+            const corsProxy = `https://corsproxy.io/?${encodeURIComponent(
+              apiUrl
+            )}`;
+            const response = await fetch(corsProxy);
+            const data = await response.json();
+
+            if (data.resultCount > 0) {
+              const track = data.results[0];
+              // Construct embed URL
+              // e.g. https://embed.music.apple.com/us/album/song-name/12345?i=67890
+              const collectionId = track.collectionId;
+              const embedUrl = `https://embed.music.apple.com/${country}/album/${collectionId}?i=${trackId}&app=music`;
+
+              embedFrame.src = embedUrl;
+              embedPlayer.style.display = "block";
+              statusEl.textContent = "Loaded in Apple Music Embed Player.";
+            } else {
+              statusEl.textContent = "Track not found for embed.";
+            }
+          } catch (err) {
+            console.error(err);
+            statusEl.textContent = "Error setting up embed.";
+          }
+          return;
+        }
+
+        // Standard Custom Player Logic (30s preview)
+        try {
+          console.log("Fetching Apple Music track:", trackId, country);
+          // Use CORS proxy for HTTPS requests
+          const apiUrl = `https://itunes.apple.com/lookup?id=${trackId}&country=${country}`;
+          const corsProxy = `https://corsproxy.io/?${encodeURIComponent(
+            apiUrl
+          )}`;
+
+          const response = await fetch(corsProxy);
+          const data = await response.json();
+
+          console.log("Apple Music API response:", data);
+
+          if (data.resultCount > 0) {
+            const track = data.results[0];
+
+            if (track.previewUrl) {
+              // Update UI
+              console.log("Setting up Apple Music preview:", track.trackName);
+              trackInfoEl.textContent = track.trackName || "Unknown Track";
+              artistInfoEl.textContent = track.artistName || "Unknown Artist";
+              currentPreviewUrl = track.previewUrl;
+
+              customPlayer.classList.add("active");
+              playerStatusEl.textContent = "Ready to play";
+
+              // Auto-play if possible (might be blocked by browser if no user interaction preceded)
+              playAudio(currentPreviewUrl);
+            } else {
+              console.log("No preview URL found");
+              statusEl.textContent = "No preview available for this track.";
+            }
+          } else {
+            statusEl.textContent = "Track not found in iTunes API.";
+          }
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = "Error fetching track info.";
+        }
+      }
+
+      // --- QR / Input Handling ---
+
+      function updateLinkDisplay() {
+        if (!lastDetectedText) return;
+
+        const devEnabled = devModeCheckbox.checked;
+        const platform = detectPlatform(lastDetectedText);
+        linkEl.innerHTML = "";
+
+        if (lastSource === "scan" && !devEnabled) {
+          statusEl.textContent = "QR detected (hidden) — processing...";
+        } else {
+          const platformName =
+            platform === "spotify"
+              ? "Spotify"
+              : platform === "apple"
+              ? "Apple Music"
+              : "Unknown";
+          statusEl.textContent = `QR detected (${platformName})`;
+          if (devEnabled) {
+            const a = document.createElement("a");
+            a.href = lastDetectedText;
+            a.textContent = lastDetectedText;
+            a.target = "_blank";
+            linkEl.appendChild(a);
+          }
+        }
+
+        const info = extractTrackInfo(lastDetectedText);
+        if (!info) {
+          const note = document.createElement("div");
+          note.className = "muted";
+          note.textContent = "Not a valid Apple Music or Spotify track URL.";
+          linkEl.appendChild(note);
+        }
+      }
+
+      function handleDetected(text, source = "scan") {
+        lastDetectedText = text;
+        lastSource = source;
+        updateLinkDisplay();
+
+        const info = extractTrackInfo(text);
+        if (info) {
+          fetchAndSetupPlayer(info);
+        }
+      }
+
+      // --- Camera Logic ---
+
+      async function startCamera() {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" },
+          });
+          video.srcObject = stream;
+          await video.play();
+          scanning = true;
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          statusEl.textContent = "Scanning for QR codes…";
+          tick();
+        } catch (err) {
+          statusEl.textContent = "Camera error: " + err.message;
+        }
+      }
+
+      function stopCamera() {
+        scanning = false;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        statusEl.textContent = "Camera stopped.";
+        if (stream) {
+          stream.getTracks().forEach((t) => t.stop());
+          stream = null;
+        }
+        video.pause();
+        video.srcObject = null;
+      }
+
+      function tick() {
+        if (!scanning) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "attemptBoth",
+          });
+          if (code) {
+            handleDetected(code.data, "scan");
+            stopCamera();
+            return;
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+
+      // File upload fallback
+      fileInput.addEventListener("change", (ev) => {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = () => {
+          img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height
+            );
+            const code = jsQR(
+              imageData.data,
+              imageData.width,
+              imageData.height,
+              { inversionAttempts: "attemptBoth" }
+            );
+            if (code) handleDetected(code.data, "file");
+            else statusEl.textContent = "No QR detected in image.";
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(f);
+      });
+
+      // Manual URL input
+      playUrlBtn.addEventListener("click", () => {
+        const url = urlInput.value && urlInput.value.trim();
+        if (!url) return;
+        handleDetected(url, "manual");
+      });
+
+      // Re-load player if toggle changes while a track is loaded
+      useEmbedCheckbox.addEventListener("change", () => {
+        if (lastDetectedText) {
+          const info = extractTrackInfo(lastDetectedText);
+          if (info) {
+            // Stop any current audio before switching
+            stopAudio();
+            fetchAndSetupPlayer(info.trackId, info.country);
+          }
+        }
+      });
+
+      startBtn.addEventListener("click", startCamera);
+      stopBtn.addEventListener("click", stopCamera);
+    </script>
+  </body>
+</html>
