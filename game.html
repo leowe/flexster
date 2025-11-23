@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Flexster — Virtual Game</title>
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <script src="https://sdk.scdn.co/spotify-player.js" defer></script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 2.5em;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Screen Management */
+      .screen {
+        display: none;
+      }
+
+      .screen.active {
+        display: block;
+      }
+
+      /* Setup Screen */
+      .setup-box {
+        background: white;
+        color: #333;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .setup-box h2 {
+        margin-bottom: 20px;
+        color: #667eea;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #555;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 16px;
+      }
+
+      input[type="text"]:focus,
+      input[type="number"]:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      button {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.1s, background 0.2s;
+      }
+
+      button:hover {
+        background: #5568d3;
+      }
+
+      button:active {
+        transform: scale(0.98);
+      }
+
+      button.secondary {
+        background: #6c757d;
+      }
+
+      button.secondary:hover {
+        background: #5a6268;
+      }
+
+      .team-list {
+        margin: 15px 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .team-item {
+        background: #f8f9fa;
+        padding: 10px 15px;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .team-item button {
+        padding: 6px 12px;
+        font-size: 14px;
+        background: #dc3545;
+      }
+
+      .team-item button:hover {
+        background: #c82333;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      /* Game Screen */
+      .game-header {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        backdrop-filter: blur(10px);
+      }
+
+      .score-board {
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+
+      .team-score {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 15px 25px;
+        border-radius: 10px;
+        text-align: center;
+        min-width: 150px;
+      }
+
+      .team-score.active {
+        background: rgba(255, 255, 255, 0.4);
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        transform: scale(1.05);
+      }
+
+      .team-score h3 {
+        font-size: 1.2em;
+        margin-bottom: 5px;
+      }
+
+      .team-score .score {
+        font-size: 2em;
+        font-weight: bold;
+      }
+
+      .current-turn {
+        text-align: center;
+        font-size: 1.3em;
+        margin-top: 10px;
+      }
+
+      .game-area {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      @media (max-width: 768px) {
+        .game-area {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Current Card */
+      .current-card-container {
+        background: white;
+        color: #333;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      .current-card-container h2 {
+        color: #667eea;
+        margin-bottom: 20px;
+      }
+
+      .music-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .music-card:active {
+        cursor: grabbing;
+      }
+
+      .music-card.dragging {
+        opacity: 0.5;
+      }
+
+      .music-card h3 {
+        font-size: 1.5em;
+        margin-bottom: 10px;
+      }
+
+      .music-card .artist {
+        font-size: 1.1em;
+        opacity: 0.9;
+        margin-bottom: 10px;
+      }
+
+      .music-card .year {
+        font-size: 2em;
+        font-weight: bold;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 2px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .card-actions {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+      }
+
+      /* Timeline */
+      .timeline-container {
+        background: white;
+        color: #333;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        min-height: 400px;
+      }
+
+      .timeline-container h2 {
+        color: #667eea;
+        margin-bottom: 20px;
+      }
+
+      .timeline {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .timeline-slot {
+        min-height: 80px;
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        padding: 10px;
+        transition: all 0.3s;
+        position: relative;
+      }
+
+      .timeline-slot.drag-over {
+        background: #e3f2fd;
+        border-color: #667eea;
+        border-style: solid;
+      }
+
+      .timeline-slot.filled {
+        border-style: solid;
+        border-color: #667eea;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .timeline-slot.filled .slot-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .timeline-slot .year-marker {
+        position: absolute;
+        top: -12px;
+        left: 10px;
+        background: #667eea;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.9em;
+        font-weight: bold;
+      }
+
+      .timeline-info {
+        flex: 1;
+      }
+
+      .timeline-info h4 {
+        font-size: 1.1em;
+        margin-bottom: 5px;
+      }
+
+      .timeline-info p {
+        opacity: 0.9;
+        font-size: 0.9em;
+      }
+
+      .remove-card {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 6px 12px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 0.9em;
+      }
+
+      .remove-card:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .empty-timeline {
+        text-align: center;
+        color: #999;
+        padding: 40px;
+        font-style: italic;
+      }
+
+      /* Feedback Messages */
+      .feedback {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        color: #333;
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        display: none;
+        animation: slideIn 0.3s;
+      }
+
+      .feedback.show {
+        display: block;
+      }
+
+      .feedback.correct {
+        background: #28a745;
+        color: white;
+      }
+
+      .feedback.incorrect {
+        background: #dc3545;
+        color: white;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(400px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      /* End Game Screen */
+      .end-game-box {
+        background: white;
+        color: #333;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        max-width: 600px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .end-game-box h2 {
+        color: #667eea;
+        font-size: 2.5em;
+        margin-bottom: 30px;
+      }
+
+      .final-scores {
+        margin: 30px 0;
+      }
+
+      .final-score-item {
+        background: #f8f9fa;
+        padding: 20px;
+        margin-bottom: 15px;
+        border-radius: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 1.2em;
+      }
+
+      .final-score-item.winner {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .winner-badge {
+        font-size: 2em;
+      }
+
+      .error-msg {
+        background: #fff3cd;
+        color: #856404;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 15px 0;
+        border: 1px solid #ffeaa7;
+      }
+
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 2000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6);
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal.show {
+        display: flex;
+      }
+
+      .modal-content {
+        background-color: white;
+        color: #333;
+        padding: 30px;
+        border-radius: 15px;
+        text-align: center;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        animation: popIn 0.3s;
+      }
+
+      .modal-content h2 {
+        color: #dc3545;
+        margin-bottom: 15px;
+      }
+
+      .modal-content p {
+        margin-bottom: 10px;
+        font-size: 1.1em;
+      }
+
+      .modal-content .year-reveal {
+        font-size: 2em;
+        font-weight: bold;
+        color: #667eea;
+        margin: 15px 0;
+      }
+
+      @keyframes popIn {
+        from {
+          transform: scale(0.8);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎵 Flexster Virtual Game</h1>
+
+      <!-- Setup Screen -->
+      <div id="setupScreen" class="screen active">
+        <div class="setup-box">
+          <h2>Game Setup</h2>
+
+          <div class="form-group">
+            <label>Upload Music Cards CSV:</label>
+            <input
+              type="file"
+              id="csvUpload"
+              accept=".csv"
+              aria-label="CSV Upload"
+            />
+            <div
+              id="csvStatus"
+              style="margin-top: 10px; font-size: 0.9em"
+            ></div>
+          </div>
+
+          <div class="form-group">
+            <label>Team Name:</label>
+            <input
+              type="text"
+              id="teamNameInput"
+              placeholder="Enter team name"
+              aria-label="Team Name"
+            />
+            <button
+              id="addTeamBtn"
+              style="margin-top: 10px"
+              aria-label="Add Team"
+            >
+              Add Team
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label>Teams:</label>
+            <ul id="teamList" class="team-list"></ul>
+            <div id="teamError" class="error-msg" style="display: none"></div>
+          </div>
+
+          <div class="button-group">
+            <button id="startGameBtn">Start Game</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Screen -->
+      <div id="gameScreen" class="screen">
+        <div class="game-header">
+          <div class="score-board" id="scoreBoard"></div>
+          <div class="current-turn" id="currentTurn"></div>
+        </div>
+
+        <div class="game-area">
+          <div class="current-card-container">
+            <h2>Current Card</h2>
+            <div id="currentCardDisplay"></div>
+            <div class="card-actions">
+              <button id="checkBtn">Check Answer</button>
+              <button id="skipBtn" class="secondary">Skip Card</button>
+              <button
+                id="nextTurnActionBtn"
+                style="display: none; background: #28a745"
+              >
+                Start Next Turn
+              </button>
+              <button id="endGameBtn" class="secondary">End Game</button>
+            </div>
+          </div>
+
+          <div class="timeline-container">
+            <h2>Timeline (Chronological Order)</h2>
+            <div id="timeline" class="timeline"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- End Game Screen -->
+      <div id="endGameScreen" class="screen">
+        <div class="end-game-box">
+          <h2>🏆 Game Over!</h2>
+          <div class="final-scores" id="finalScores"></div>
+          <button id="newGameBtn">New Game</button>
+        </div>
+      </div>
+
+      <!-- Incorrect Answer Modal -->
+      <div id="incorrectModal" class="modal">
+        <div class="modal-content">
+          <h2>✗ Incorrect!</h2>
+          <div id="incorrectDetails"></div>
+          <button id="nextTurnBtn">Close</button>
+        </div>
+      </div>
+
+      <!-- Feedback -->
+      <div id="feedback" class="feedback"></div>
+
+      <!-- Modal -->
+      <div id="infoModal" class="modal">
+        <div class="modal-content">
+          <h2>Card Information</h2>
+          <p id="modalCardTitle"></p>
+          <p id="modalCardArtist"></p>
+          <p class="year-reveal" id="modalCardYear"></p>
+          <button id="closeModalBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Game State
+      let gameState = {
+        teams: [],
+        currentTeamIndex: 0,
+        cards: [],
+        remainingCards: [],
+        timelines: {},
+        currentCard: null,
+        scores: {},
+      };
+
+      // Audio Player State
+      let audioPlayer = {
+        spotifyPlayer: null,
+        spotifyDeviceId: null,
+        spotifyToken: localStorage.getItem("spotify_access_token"),
+        currentAudio: null,
+        isPlaying: false,
+      };
+
+      // Initialize Spotify
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        if (audioPlayer.spotifyToken) {
+          const player = new Spotify.Player({
+            name: "Flexster Game Player",
+            getOAuthToken: (cb) => {
+              cb(audioPlayer.spotifyToken);
+            },
+            volume: 0.8,
+          });
+
+          player.addListener("ready", ({ device_id }) => {
+            console.log("Spotify Ready with Device ID", device_id);
+            audioPlayer.spotifyDeviceId = device_id;
+            audioPlayer.spotifyPlayer = player;
+          });
+
+          player.connect();
+        }
+      };
+
+      // DOM Elements
+      const screens = {
+        setup: document.getElementById("setupScreen"),
+        game: document.getElementById("gameScreen"),
+        endGame: document.getElementById("endGameScreen"),
+      };
+
+      const setupElements = {
+        csvUpload: document.getElementById("csvUpload"),
+        csvStatus: document.getElementById("csvStatus"),
+        teamNameInput: document.getElementById("teamNameInput"),
+        addTeamBtn: document.getElementById("addTeamBtn"),
+        teamList: document.getElementById("teamList"),
+        teamError: document.getElementById("teamError"),
+        startGameBtn: document.getElementById("startGameBtn"),
+      };
+
+      const gameElements = {
+        scoreBoard: document.getElementById("scoreBoard"),
+        currentTurn: document.getElementById("currentTurn"),
+        currentCardDisplay: document.getElementById("currentCardDisplay"),
+        timeline: document.getElementById("timeline"),
+        checkBtn: document.getElementById("checkBtn"),
+        skipBtn: document.getElementById("skipBtn"),
+        endGameBtn: document.getElementById("endGameBtn"),
+        nextTurnActionBtn: document.getElementById("nextTurnActionBtn"),
+      };
+
+      const endGameElements = {
+        finalScores: document.getElementById("finalScores"),
+        newGameBtn: document.getElementById("newGameBtn"),
+      };
+
+      const modalElements = {
+        modal: document.getElementById("incorrectModal"),
+        details: document.getElementById("incorrectDetails"),
+        nextBtn: document.getElementById("nextTurnBtn"),
+      };
+
+      const feedbackEl = document.getElementById("feedback");
+
+      // Utility Functions
+      function showScreen(screenName) {
+        Object.values(screens).forEach((s) => s.classList.remove("active"));
+        screens[screenName].classList.add("active");
+      }
+
+      function showFeedback(message, type = "info") {
+        feedbackEl.textContent = message;
+        feedbackEl.className = `feedback show ${type}`;
+        setTimeout(() => {
+          feedbackEl.classList.remove("show");
+        }, 3000);
+      }
+
+      // CSV Parsing
+      setupElements.csvUpload.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const csv = event.target.result;
+            const lines = csv.split("\n").filter((line) => line.trim());
+            const headers = lines[0].split(",");
+
+            gameState.cards = [];
+
+            for (let i = 1; i < lines.length; i++) {
+              const values = parseCSVLine(lines[i]);
+              if (values.length < headers.length) continue;
+
+              const card = {};
+              headers.forEach((header, index) => {
+                card[header.trim()] = values[index]?.trim() || "";
+              });
+
+              // Determine the year to use
+              let year = parseInt(card.year) || 0;
+              if (!year || year === 0) {
+                year = parseInt(card.recording_year) || 0;
+              }
+              if (!year || year === 0) {
+                year = parseInt(card.composition_year) || 0;
+              }
+
+              if (year > 0) {
+                card.sortYear = year;
+                gameState.cards.push(card);
+              }
+            }
+
+            setupElements.csvStatus.innerHTML = `<span style="color: #28a745;">✓ Loaded ${gameState.cards.length} cards</span>`;
+          } catch (err) {
+            console.error(err);
+            setupElements.csvStatus.innerHTML = `<span style="color: #dc3545;">✗ Error parsing CSV</span>`;
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Simple CSV parser that handles quoted fields
+      function parseCSVLine(line) {
+        const result = [];
+        let current = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === "," && !inQuotes) {
+            result.push(current);
+            current = "";
+          } else {
+            current += char;
+          }
+        }
+        result.push(current);
+
+        return result;
+      }
+
+      // Team Management
+      setupElements.addTeamBtn.addEventListener("click", () => {
+        const name = setupElements.teamNameInput.value.trim();
+        if (!name) {
+          setupElements.teamError.textContent = "Please enter a team name";
+          setupElements.teamError.style.display = "block";
+          return;
+        }
+
+        if (gameState.teams.includes(name)) {
+          setupElements.teamError.textContent = "Team name already exists";
+          setupElements.teamError.style.display = "block";
+          return;
+        }
+
+        gameState.teams.push(name);
+        gameState.scores[name] = 0;
+        gameState.timelines[name] = [];
+        setupElements.teamError.style.display = "none";
+        setupElements.teamNameInput.value = "";
+        renderTeamList();
+      });
+
+      function renderTeamList() {
+        setupElements.teamList.innerHTML = "";
+        gameState.teams.forEach((team, index) => {
+          const li = document.createElement("li");
+          li.className = "team-item";
+          li.innerHTML = `
+            <span>${team}</span>
+            <button onclick="removeTeam(${index})">Remove</button>
+          `;
+          setupElements.teamList.appendChild(li);
+        });
+      }
+
+      function removeTeam(index) {
+        const teamName = gameState.teams[index];
+        gameState.teams.splice(index, 1);
+        delete gameState.scores[teamName];
+        delete gameState.timelines[teamName];
+        renderTeamList();
+      }
+      window.removeTeam = removeTeam;
+
+      // Start Game
+      setupElements.startGameBtn.addEventListener("click", () => {
+        if (gameState.teams.length < 1) {
+          setupElements.teamError.textContent = "Please add at least one team";
+          setupElements.teamError.style.display = "block";
+          return;
+        }
+
+        if (gameState.cards.length === 0) {
+          setupElements.csvStatus.innerHTML = `<span style="color: #dc3545;">Please upload a CSV file with music cards</span>`;
+          return;
+        }
+
+        // Initialize game
+        gameState.remainingCards = [...gameState.cards];
+        shuffleArray(gameState.remainingCards);
+        gameState.currentTeamIndex = 0;
+
+        showScreen("game");
+        drawNewCard();
+        updateGameDisplay();
+      });
+
+      function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      function drawNewCard() {
+        if (gameState.remainingCards.length === 0) {
+          endGame();
+          return;
+        }
+
+        const card = gameState.remainingCards.pop();
+        gameState.currentCard = card;
+
+        // Create card element
+        const cardEl = document.createElement("div");
+        cardEl.className = "music-card";
+        cardEl.draggable = true;
+        cardEl.innerHTML = `
+            <h3>???</h3>
+            <p class="artist">???</p>
+            <div class="year">????</div>
+            <button id="playMusicBtn">▶ Play Preview</button>
+        `;
+
+        // Add event listeners
+        cardEl.addEventListener("dragstart", handleDragStart);
+        cardEl.addEventListener("dragend", handleDragEnd);
+
+        // Setup play button
+        const playBtn = cardEl.querySelector("#playMusicBtn");
+        playBtn.addEventListener("click", (e) => {
+          e.stopPropagation(); // Prevent drag start when clicking button
+          toggleCardMusic(gameState.currentCard);
+        });
+
+        // Update display
+        gameElements.currentCardDisplay.innerHTML = "";
+        gameElements.currentCardDisplay.appendChild(cardEl);
+
+        stopAudio();
+      }
+
+      function updatePlayButton() {
+        const btn = document.getElementById("playMusicBtn");
+        if (btn) {
+          btn.textContent = audioPlayer.isPlaying
+            ? "⏸ Stop Preview"
+            : "▶ Play Preview";
+        }
+      }
+
+      function stopAudio() {
+        if (audioPlayer.currentAudio) {
+          audioPlayer.currentAudio.pause();
+          audioPlayer.currentAudio = null;
+        }
+        if (audioPlayer.spotifyPlayer) {
+          audioPlayer.spotifyPlayer.pause();
+        }
+        audioPlayer.isPlaying = false;
+        updatePlayButton();
+      }
+
+      async function toggleCardMusic(card) {
+        if (audioPlayer.isPlaying) {
+          stopAudio();
+          return;
+        }
+
+        await playCardMusic(card);
+      }
+
+      async function playCardMusic(card) {
+        console.log("Playing card:", card);
+        stopAudio();
+
+        // Try Spotify first if available
+        if (
+          card.spotify_link &&
+          audioPlayer.spotifyPlayer &&
+          audioPlayer.spotifyDeviceId
+        ) {
+          // Extract ID
+          const match = card.spotify_link.match(/track\/([a-zA-Z0-9]+)/);
+          if (match) {
+            const trackUri = `spotify:track:${match[1]}`;
+            await fetch(
+              `https://api.spotify.com/v1/me/player/play?device_id=${audioPlayer.spotifyDeviceId}`,
+              {
+                method: "PUT",
+                body: JSON.stringify({ uris: [trackUri] }),
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${audioPlayer.spotifyToken}`,
+                },
+              }
+            );
+            audioPlayer.isPlaying = true;
+            updatePlayButton();
+            return;
+          }
+        }
+
+        // Try Apple Music Preview
+        if (card.apple_link) {
+          // Match ID in query param (i=...) or at end of path (with optional query params)
+          const match =
+            card.apple_link.match(/i=([0-9]+)/) ||
+            card.apple_link.match(/\/([0-9]+)(?:\?|$)/);
+
+          const countryMatch = card.apple_link.match(
+            /music\.apple\.com\/([a-z]{2})\//
+          );
+          const country = countryMatch ? countryMatch[1] : "us";
+
+          if (match) {
+            const trackId = match[1];
+            console.log("Apple Music Track ID:", trackId);
+            try {
+              const res = await fetch(
+                `https://corsproxy.io/?${encodeURIComponent(
+                  `https://itunes.apple.com/lookup?id=${trackId}&country=${country}`
+                )}`
+              );
+              const data = await res.json();
+              if (
+                data.results &&
+                data.results.length > 0 &&
+                data.results[0].previewUrl
+              ) {
+                audioPlayer.currentAudio = new Audio(
+                  data.results[0].previewUrl
+                );
+                audioPlayer.currentAudio.play();
+                audioPlayer.currentAudio.onended = () => {
+                  audioPlayer.isPlaying = false;
+                  updatePlayButton();
+                };
+                audioPlayer.isPlaying = true;
+                updatePlayButton();
+                return;
+              } else {
+                console.warn("No preview URL found in iTunes API result");
+              }
+            } catch (e) {
+              console.error("Error fetching Apple Music preview:", e);
+            }
+          } else {
+            console.warn(
+              "Could not extract Apple Music ID from link:",
+              card.apple_link
+            );
+          }
+        }
+
+        alert(
+          "Could not play preview. Please check if Spotify is connected (via main page) or Apple Music link is valid."
+        );
+      }
+
+      function renderTimeline() {
+        const currentTeam = gameState.teams[gameState.currentTeamIndex];
+        const timelineData = gameState.timelines[currentTeam];
+        const timeline = gameElements.timeline;
+        timeline.innerHTML = "";
+
+        if (timelineData.length === 0) {
+          timeline.innerHTML =
+            '<p class="empty-timeline">Timeline is empty. Drag the card here!</p>';
+          // Add a drop zone for the first card
+          const dropZone = document.createElement("div");
+          dropZone.className = "timeline-slot";
+          dropZone.dataset.position = "0";
+          dropZone.addEventListener("dragover", handleDragOver);
+          dropZone.addEventListener("dragleave", handleDragLeave);
+          dropZone.addEventListener("drop", handleDrop);
+          timeline.appendChild(dropZone);
+          return;
+        }
+
+        // Add drop zone at the beginning
+        const firstSlot = document.createElement("div");
+        firstSlot.className = "timeline-slot";
+        firstSlot.dataset.position = "0";
+        firstSlot.addEventListener("dragover", handleDragOver);
+        firstSlot.addEventListener("dragleave", handleDragLeave);
+        firstSlot.addEventListener("drop", handleDrop);
+        timeline.appendChild(firstSlot);
+
+        // Render existing cards with drop zones between them
+        timelineData.forEach((card, index) => {
+          const isRevealed = card.verified || card.incorrect;
+          const yearDisplay = isRevealed ? card.sortYear : "???";
+          const titleDisplay = isRevealed ? card.title : "???";
+          const artistDisplay = isRevealed ? card.artist : "???";
+
+          let slotClass = "timeline-slot filled";
+          let style = "";
+
+          if (card.incorrect) {
+            slotClass += " incorrect";
+            style = "background: #dc3545; border-color: #bd2130; color: white;";
+          } else if (!card.verified) {
+            slotClass += " unverified";
+            style = "background: #999; border-color: #777;";
+          }
+
+          const slot = document.createElement("div");
+          slot.className = slotClass;
+          if (style) slot.style.cssText = style;
+
+          slot.innerHTML = `
+            <span class="year-marker" style="${
+              card.verified ? "" : "background: #555;"
+            }">${yearDisplay}</span>
+            <div class="slot-content">
+              <div class="timeline-info">
+                <h4>${titleDisplay}</h4>
+                <p>${artistDisplay}</p>
+              </div>
+            </div>
+          `;
+          timeline.appendChild(slot);
+
+          // Add drop zone after each card
+          const dropSlot = document.createElement("div");
+          dropSlot.className = "timeline-slot";
+          dropSlot.dataset.position = index + 1;
+          dropSlot.addEventListener("dragover", handleDragOver);
+          dropSlot.addEventListener("dragleave", handleDragLeave);
+          dropSlot.addEventListener("drop", handleDrop);
+          timeline.appendChild(dropSlot);
+        });
+      }
+
+      function updateGameDisplay() {
+        // Update score board
+        gameElements.scoreBoard.innerHTML = "";
+        gameState.teams.forEach((team, index) => {
+          const scoreDiv = document.createElement("div");
+          scoreDiv.className = "team-score";
+          if (index === gameState.currentTeamIndex) {
+            scoreDiv.classList.add("active");
+          }
+          scoreDiv.innerHTML = `
+            <h3>${team}</h3>
+            <div class="score">${gameState.scores[team]}</div>
+          `;
+          gameElements.scoreBoard.appendChild(scoreDiv);
+        });
+
+        // Update current turn
+        const currentTeam = gameState.teams[gameState.currentTeamIndex];
+        const cardsLeft = gameState.remainingCards.length;
+        gameElements.currentTurn.textContent = `${currentTeam}'s turn | ${cardsLeft} cards remaining`;
+
+        // Render timeline for the current team
+        renderTimeline();
+      }
+
+      // Drag and Drop
+      let draggedPosition = null;
+
+      function handleDragStart(e) {
+        e.currentTarget.classList.add("dragging");
+        e.dataTransfer.setData("text/plain", "card");
+        e.dataTransfer.effectAllowed = "move";
+      }
+
+      function handleDragEnd(e) {
+        e.currentTarget.classList.remove("dragging");
+      }
+
+      function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        e.currentTarget.classList.add("drag-over");
+      }
+
+      function handleDragLeave(e) {
+        e.currentTarget.classList.remove("drag-over");
+      }
+
+      function handleDrop(e) {
+        e.preventDefault();
+        e.currentTarget.classList.remove("drag-over");
+
+        const position = parseInt(e.currentTarget.dataset.position);
+        draggedPosition = position;
+
+        const currentTeam = gameState.teams[gameState.currentTeamIndex];
+        const timelineData = gameState.timelines[currentTeam];
+
+        // Remove any previously placed unverified card
+        const existingUnverifiedIndex = timelineData.findIndex(
+          (c) => !c.verified
+        );
+        if (existingUnverifiedIndex !== -1) {
+          timelineData.splice(existingUnverifiedIndex, 1);
+          // Adjust position if needed
+          if (position > existingUnverifiedIndex) {
+            draggedPosition--;
+          }
+        }
+
+        // Insert card at position (temporarily)
+        gameState.currentCard.verified = false;
+        timelineData.splice(draggedPosition, 0, gameState.currentCard);
+
+        // Visual feedback
+        renderTimeline();
+      }
+
+      // Check Answer
+      gameElements.checkBtn.addEventListener("click", () => {
+        const currentTeam = gameState.teams[gameState.currentTeamIndex];
+        const timelineData = gameState.timelines[currentTeam];
+
+        // Find the unverified card
+        const unverifiedIndex = timelineData.findIndex(
+          (c) => !c.verified && !c.incorrect
+        );
+
+        if (unverifiedIndex === -1) {
+          showFeedback(
+            "Please place the card on the timeline first!",
+            "incorrect"
+          );
+          return;
+        }
+
+        // Check if the placement is correct
+        const isCorrect = checkCorrectPlacement(unverifiedIndex, timelineData);
+
+        if (isCorrect) {
+          // Mark as verified
+          timelineData[unverifiedIndex].verified = true;
+
+          // Award points
+          gameState.scores[currentTeam] += 1;
+          showFeedback("✓ Correct! Well done!", "correct");
+
+          // Check for win condition (10 points)
+          if (gameState.scores[currentTeam] >= 10) {
+            setTimeout(() => {
+              endGame();
+            }, 1500); // Small delay to see the "Correct" feedback
+            return;
+          }
+        } else {
+          // Mark as incorrect (reveals it in red)
+          timelineData[unverifiedIndex].incorrect = true;
+          showFeedback("✗ Incorrect placement!", "incorrect");
+        }
+
+        prepareNextTurn();
+      });
+
+      // Modal Next Turn Button
+      modalElements.nextBtn.addEventListener("click", () => {
+        modalElements.modal.classList.remove("show");
+        prepareNextTurn();
+      });
+
+      function prepareNextTurn() {
+        gameElements.checkBtn.style.display = "none";
+        gameElements.skipBtn.style.display = "none";
+        gameElements.nextTurnActionBtn.style.display = "inline-block";
+
+        // Reveal the card details
+        const card = gameState.currentCard;
+        const cardEl =
+          gameElements.currentCardDisplay.querySelector(".music-card");
+
+        if (cardEl) {
+          cardEl.draggable = false;
+          cardEl.style.cursor = "default";
+          // Update content to reveal details
+          cardEl.innerHTML = `
+                <h3>${card.title}</h3>
+                <p class="artist">${card.artist}</p>
+                <div class="year">${card.sortYear}</div>
+                <button id="playMusicBtn">▶ Play Preview</button>
+            `;
+
+          // Re-attach play button listener since we overwrote innerHTML
+          const playBtn = cardEl.querySelector("#playMusicBtn");
+          playBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleCardMusic(gameState.currentCard);
+          });
+          updatePlayButton();
+        }
+
+        // Re-render timeline to show verified card if it exists
+        renderTimeline();
+      }
+
+      gameElements.nextTurnActionBtn.addEventListener("click", () => {
+        const currentTeam = gameState.teams[gameState.currentTeamIndex];
+        const timelineData = gameState.timelines[currentTeam];
+
+        // Remove incorrect card from timeline if it exists
+        const incorrectIndex = timelineData.findIndex((c) => c.incorrect);
+        if (incorrectIndex !== -1) {
+          timelineData.splice(incorrectIndex, 1);
+        }
+
+        showFeedback("Next team's turn!", "info");
+        nextTurn();
+      });
+
+      function checkCorrectPlacement(position, timelineData) {
+        const card = timelineData[position];
+
+        // Check if card is in correct chronological order
+        if (position > 0) {
+          const prevCard = timelineData[position - 1];
+          if (prevCard && card.sortYear < prevCard.sortYear) {
+            return false;
+          }
+        }
+
+        if (position < timelineData.length - 1) {
+          const nextCard = timelineData[position + 1];
+          if (nextCard && card.sortYear > nextCard.sortYear) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      // Skip Card
+      gameElements.skipBtn.addEventListener("click", () => {
+        const currentTeam = gameState.teams[gameState.currentTeamIndex];
+        const timelineData = gameState.timelines[currentTeam];
+
+        // Remove current card from timeline if it was placed
+        const unverifiedIndex = timelineData.findIndex((c) => !c.verified);
+        if (unverifiedIndex !== -1) {
+          timelineData.splice(unverifiedIndex, 1);
+        }
+
+        showFeedback("Card skipped", "info");
+        prepareNextTurn();
+      });
+
+      function nextTurn() {
+        draggedPosition = null;
+
+        // Reset buttons
+        gameElements.checkBtn.style.display = "inline-block";
+        gameElements.skipBtn.style.display = "inline-block";
+        gameElements.nextTurnActionBtn.style.display = "none";
+
+        // Move to next team
+        gameState.currentTeamIndex =
+          (gameState.currentTeamIndex + 1) % gameState.teams.length;
+
+        // Draw new card
+        drawNewCard();
+        updateGameDisplay();
+      }
+
+      // End Game
+      gameElements.endGameBtn.addEventListener("click", () => {
+        if (confirm("Are you sure you want to end the game?")) {
+          endGame();
+        }
+      });
+
+      function endGame() {
+        showScreen("endGame");
+
+        // Sort teams by score
+        const sortedTeams = [...gameState.teams].sort(
+          (a, b) => gameState.scores[b] - gameState.scores[a]
+        );
+
+        endGameElements.finalScores.innerHTML = "";
+        sortedTeams.forEach((team, index) => {
+          const scoreDiv = document.createElement("div");
+          scoreDiv.className = "final-score-item";
+          if (index === 0) {
+            scoreDiv.classList.add("winner");
+            scoreDiv.innerHTML = `
+              <span><strong>${team}</strong></span>
+              <span>${gameState.scores[team]} points <span class="winner-badge">👑</span></span>
+            `;
+          } else {
+            scoreDiv.innerHTML = `
+              <span><strong>${team}</strong></span>
+              <span>${gameState.scores[team]} points</span>
+            `;
+          }
+          endGameElements.finalScores.appendChild(scoreDiv);
+        });
+      }
+
+      // New Game
+      endGameElements.newGameBtn.addEventListener("click", () => {
+        // Reset game state
+        gameState = {
+          teams: [],
+          currentTeamIndex: 0,
+          cards: [],
+          remainingCards: [],
+          timelines: {},
+          currentCard: null,
+          scores: {},
+        };
+
+        setupElements.teamList.innerHTML = "";
+        setupElements.csvStatus.innerHTML = "";
+        setupElements.teamNameInput.value = "";
+        setupElements.csvUpload.value = "";
+
+        showScreen("setup");
+      });
+    </script>
+  </body>
+</html>

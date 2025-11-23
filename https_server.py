@@ -36,12 +36,6 @@ if not os.path.exists("cert.pem") or not os.path.exists("key.pem"):
 print("=" * 60)
 print("🎵 Flexster HTTPS Server Starting...")
 print("=" * 60)
-print("\n⚠️  IMPORTANT: Update your Spotify App settings:")
-print("   1. Go to: https://developer.spotify.com/dashboard")
-print("   2. Select your app: 'Flexster'")
-print("   3. Click 'Settings' → 'Edit Settings'")
-print("   4. Set Redirect URI to: https://127.0.0.1:8000/")
-print("   5. Click 'Save'")
 print("\n📍 Server running at: https://127.0.0.1:8000")
 print("✅ Open: https://127.0.0.1:8000/index.html")
 print("\n⚠️  Your browser will warn about the self-signed certificate.")
@@ -50,7 +44,10 @@ print("=" * 60)
 print()
 
 server_address = ("127.0.0.1", 8000)
-httpd = http.server.HTTPServer(server_address, http.server.SimpleHTTPRequestHandler)
+# Use ThreadingHTTPServer to handle multiple requests concurrently (fixes slow loading)
+httpd = http.server.ThreadingHTTPServer(
+    server_address, http.server.SimpleHTTPRequestHandler
+)
 
 # Use modern SSL context instead of deprecated wrap_socket
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

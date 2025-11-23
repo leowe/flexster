@@ -127,22 +127,52 @@
       }
 
       /* Spotify Auth Styles */
-      .auth-section {
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
         margin: 12px 0;
-        padding: 12px;
+        flex-wrap: wrap;
+      }
+      .game-btn {
+        color: white;
+        background: #667eea;
+        padding: 8px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        font-weight: 600;
+        font-size: 14px;
+        height: 36px;
+        box-sizing: border-box;
+      }
+      .game-btn:hover {
+        background: #5568d3;
+      }
+
+      .auth-section {
+        margin: 0;
+        padding: 8px 12px;
         background: #1db954;
         color: white;
-        border-radius: 8px;
+        border-radius: 6px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
+        font-size: 14px;
+        width: fit-content;
+        height: 36px;
+        box-sizing: border-box;
       }
       .auth-section button {
         background: white;
         color: #1db954;
         font-weight: 600;
         border: none;
+        padding: 4px 8px;
+        font-size: 13px;
       }
       .auth-section.logged-in {
         background: #1ed760;
@@ -230,13 +260,17 @@
       </div>
     </div>
 
-    <!-- Spotify Authentication Section -->
-    <div id="authSection" class="auth-section">
-      <div id="spotifyStatus">
-        Login with Spotify Premium to enable full playback
+    <div class="top-actions">
+      <!-- Spotify Authentication Section -->
+      <div id="authSection" class="auth-section">
+        <div id="spotifyStatus">
+          Login with Spotify Premium to enable full playback
+        </div>
+        <button id="loginBtn">Login with Spotify</button>
+        <button id="logoutBtn" style="display: none">Logout</button>
       </div>
-      <button id="loginBtn">Login with Spotify</button>
-      <button id="logoutBtn" style="display: none">Logout</button>
+
+      <a href="game.html" class="game-btn"> 🎮 Play Virtual Game </a>
     </div>
 
     <div class="controls">

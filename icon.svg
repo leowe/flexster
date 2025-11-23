@@ -1,0 +1,33 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="flexGradient" x1="100" y1="100" x2="412" y2="412" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FA2D48"/>
+      <stop offset="100%" stop-color="#1DB954"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" rx="110" fill="#111111"/>
+  
+  <!-- QR Code Frame Elements (White) -->
+  <!-- Top Left -->
+  <path d="M96 96 H192 V192 H96 V96 Z M120 120 V168 H168 V120 H120 Z" fill="white"/>
+  <!-- Top Right -->
+  <path d="M320 96 H416 V192 H320 V96 Z M344 120 V168 H392 V120 H344 Z" fill="white"/>
+  <!-- Bottom Left -->
+  <path d="M96 320 H192 V416 H96 V320 Z M120 344 V392 H168 V344 H120 Z" fill="white"/>
+  
+  <!-- Decorative Pixels -->
+  <rect x="320" y="320" width="24" height="24" fill="white"/>
+  <rect x="368" y="320" width="24" height="24" fill="white"/>
+  <rect x="320" y="368" width="24" height="24" fill="white"/>
+  <rect x="392" y="392" width="24" height="24" fill="white"/>
+  <rect x="220" y="100" width="24" height="24" fill="white"/>
+  <rect x="100" y="220" width="24" height="24" fill="white"/>
+
+  <!-- Center Circle Background for Play Button -->
+  <circle cx="256" cy="256" r="90" fill="#111111" stroke="url(#flexGradient)" stroke-width="8"/>
+  
+  <!-- Play Button -->
+  <path d="M220 200 L 310 256 L 220 312 Z" fill="url(#flexGradient)"/>
+</svg>
