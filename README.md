@@ -176,3 +176,7 @@ If you want, I can:
 | Authentication   | ❌ Not required | ✅ Required (Premium) |
 | Offline          | ❌              | ❌                    |
 | Custom Controls  | ✅ Play/Stop    | ✅ Play/Pause/Stop    |
+
+### Todo
+
+-[ ] Add completely virtual way to play without needing cards: Add a game flow: Creating teams, uploading a csv, showing currently played cards, being able to drag and drop new cards into the time line, checking whether it was correct, moving to next player. Keeping score and ending the game.

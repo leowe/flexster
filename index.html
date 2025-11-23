@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Flexster — QR to Apple Music Player</title>
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
     <style>
       body {
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
@@ -151,12 +153,82 @@
       #spotifyStatus {
         flex: 1;
       }
+
+      /* Platform Choice Modal */
+      #platformModal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      #platformModal.active {
+        display: flex;
+      }
+      .modal-content {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        text-align: center;
+        max-width: 300px;
+        width: 90%;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+      .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 16px;
+      }
+      .platform-btn {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        margin: 8px 0;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        color: white;
+      }
+      .btn-apple {
+        background: #fa2d48;
+      }
+      .btn-spotify {
+        background: #1db954;
+      }
+      .btn-cancel {
+        background: #eee;
+        color: #333;
+        margin-top: 12px;
+      }
     </style>
   </head>
   <body>
     <header>
       <h1>Flexster — Scan QR → Play Music</h1>
     </header>
+
+    <!-- Platform Choice Modal -->
+    <div id="platformModal">
+      <div class="modal-content">
+        <div class="modal-title">Choose Platform</div>
+        <button id="chooseAppleBtn" class="platform-btn btn-apple">
+          Apple Music
+        </button>
+        <button id="chooseSpotifyBtn" class="platform-btn btn-spotify">
+          Spotify
+        </button>
+        <button id="cancelChoiceBtn" class="platform-btn btn-cancel">
+          Cancel
+        </button>
+      </div>
+    </div>
 
     <!-- Spotify Authentication Section -->
     <div id="authSection" class="auth-section">
@@ -254,6 +326,12 @@
       const urlInput = document.getElementById("urlInput");
       const playUrlBtn = document.getElementById("playUrlBtn");
       const useEmbedCheckbox = document.getElementById("useEmbed");
+
+      // Modal Elements
+      const platformModal = document.getElementById("platformModal");
+      const chooseAppleBtn = document.getElementById("chooseAppleBtn");
+      const chooseSpotifyBtn = document.getElementById("chooseSpotifyBtn");
+      const cancelChoiceBtn = document.getElementById("cancelChoiceBtn");
 
       // Player Elements
       const customPlayer = document.getElementById("customPlayer");
@@ -959,7 +1037,21 @@
         if (!lastDetectedText) return;
 
         const devEnabled = devModeCheckbox.checked;
-        const platform = detectPlatform(lastDetectedText);
+        let displayText = lastDetectedText;
+        let platform = "Unknown";
+
+        // Check if it's our JSON format
+        try {
+          const data = JSON.parse(lastDetectedText);
+          if (data.a || data.s) {
+            displayText = "Combined QR Code";
+            platform = "Multi-Platform";
+          }
+        } catch (e) {
+          // Not JSON, standard URL
+          platform = detectPlatform(lastDetectedText) || "Unknown";
+        }
+
         linkEl.innerHTML = "";
 
         if (lastSource === "scan" && !devEnabled) {
@@ -970,23 +1062,25 @@
               ? "Spotify"
               : platform === "apple"
               ? "Apple Music"
-              : "Unknown";
+              : platform;
           statusEl.textContent = `QR detected (${platformName})`;
           if (devEnabled) {
-            const a = document.createElement("a");
-            a.href = lastDetectedText;
-            a.textContent = lastDetectedText;
-            a.target = "_blank";
-            linkEl.appendChild(a);
+            const div = document.createElement("div");
+            div.textContent = displayText;
+            div.style.wordBreak = "break-all";
+            linkEl.appendChild(div);
           }
         }
 
-        const info = extractTrackInfo(lastDetectedText);
-        if (!info) {
-          const note = document.createElement("div");
-          note.className = "muted";
-          note.textContent = "Not a valid Apple Music or Spotify track URL.";
-          linkEl.appendChild(note);
+        // If it's a direct URL, show error if invalid
+        if (platform !== "Multi-Platform") {
+          const info = extractTrackInfo(lastDetectedText);
+          if (!info) {
+            const note = document.createElement("div");
+            note.className = "muted";
+            note.textContent = "Not a valid Apple Music or Spotify track URL.";
+            linkEl.appendChild(note);
+          }
         }
       }
 
@@ -995,10 +1089,53 @@
         lastSource = source;
         updateLinkDisplay();
 
+        // Try to parse as JSON first
+        try {
+          const data = JSON.parse(text);
+          if (data.a || data.s) {
+            // It's a combined QR
+            showPlatformChoice(data);
+            return;
+          }
+        } catch (e) {
+          // Not JSON, continue as normal URL
+        }
+
         const info = extractTrackInfo(text);
         if (info) {
           fetchAndSetupPlayer(info);
         }
+      }
+
+      function showPlatformChoice(data) {
+        // If only one link is present, auto-select it
+        if (data.a && !data.s) {
+          handleDetected(data.a, lastSource);
+          return;
+        }
+        if (data.s && !data.a) {
+          handleDetected(data.s, lastSource);
+          return;
+        }
+
+        // Show modal
+        platformModal.classList.add("active");
+
+        // Set up one-time event listeners
+        chooseAppleBtn.onclick = () => {
+          platformModal.classList.remove("active");
+          handleDetected(data.a, lastSource);
+        };
+
+        chooseSpotifyBtn.onclick = () => {
+          platformModal.classList.remove("active");
+          handleDetected(data.s, lastSource);
+        };
+
+        cancelChoiceBtn.onclick = () => {
+          platformModal.classList.remove("active");
+          statusEl.textContent = "Selection cancelled.";
+        };
       }
 
       // --- Camera Logic ---

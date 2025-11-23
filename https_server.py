@@ -10,14 +10,27 @@ import os
 import subprocess
 
 # Check if certificate exists, if not create it
-if not os.path.exists('cert.pem') or not os.path.exists('key.pem'):
+if not os.path.exists("cert.pem") or not os.path.exists("key.pem"):
     print("Generating self-signed certificate...")
-    subprocess.run([
-        'openssl', 'req', '-x509', '-newkey', 'rsa:4096',
-        '-keyout', 'key.pem', '-out', 'cert.pem',
-        '-days', '365', '-nodes',
-        '-subj', '/CN=127.0.0.1'
-    ], check=True)
+    subprocess.run(
+        [
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:4096",
+            "-keyout",
+            "key.pem",
+            "-out",
+            "cert.pem",
+            "-days",
+            "365",
+            "-nodes",
+            "-subj",
+            "/CN=127.0.0.1",
+        ],
+        check=True,
+    )
     print("Certificate generated!")
 
 print("=" * 60)
@@ -36,12 +49,12 @@ print("   Click 'Advanced' → 'Proceed to 127.0.0.1 (unsafe)' to continue.")
 print("=" * 60)
 print()
 
-server_address = ('127.0.0.1', 8000)
+server_address = ("127.0.0.1", 8000)
 httpd = http.server.HTTPServer(server_address, http.server.SimpleHTTPRequestHandler)
 
 # Use modern SSL context instead of deprecated wrap_socket
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
+ssl_context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
 httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
 
 httpd.serve_forever()
