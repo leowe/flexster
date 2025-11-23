@@ -5,13 +5,17 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import qrcode
 import io
+import logging
+
+logger = logging.getLogger(__name__)
 
 class PDFGenerator:
-    def __init__(self, filename="music_cards.pdf", mirror_metadata=True, rows=4, cols=3):
+    def __init__(self, filename="music_cards.pdf", mirror_metadata=True, rows=4, cols=3, platform="apple"):
         self.filename = filename
         self.mirror_metadata = mirror_metadata
         self.rows = rows
         self.cols = cols
+        self.platform = platform
         self.styles = getSampleStyleSheet()
 
     def generate_qr_image(self, data):
@@ -80,7 +84,14 @@ class PDFGenerator:
                     idx = r * COLS + c
                     if idx < len(chunk):
                         item = chunk[idx]
-                        qr_buffer = self.generate_qr_image(item['link'])
+                        # Select link based on platform
+                        link_key = f"{self.platform}_link"
+                        qr_link = item.get(link_key)
+                        if not qr_link:
+                            logger.warning(f"No {self.platform} link found for '{item.get('title', 'Unknown')}', skipping QR code")
+                            row_data.append("")
+                            continue
+                        qr_buffer = self.generate_qr_image(qr_link)
                         # Scale QR code to fit nicely
                         qr_size = min(col_width, row_height) * 0.8
                         qr_img = Image(qr_buffer, width=qr_size, height=qr_size)
@@ -117,10 +128,34 @@ class PDFGenerator:
                     idx = r * COLS + c
                     if idx < len(chunk):
                         item = chunk[idx]
+
+                        composition_year = item.get('composition_year') or ""
+                        recording_year = item.get('recording_year') or ""
+
+                        # Build separate year lines - prefer earlier date as composition
+                        if composition_year and recording_year:
+                            # Use the earlier year as composition
+                            try:
+                                comp_int = int(composition_year)
+                                rec_int = int(recording_year)
+                                if comp_int > rec_int:
+                                    # Swap if composition year is later
+                                    composition_year, recording_year = recording_year, composition_year
+                            except ValueError:
+                                pass  # Keep as is if conversion fails
+                        
+                        if composition_year:
+                            year_line = f"<b><font size=14>{composition_year}</font></b><br/>"
+                            if recording_year and composition_year != recording_year:
+                                year_line += f"<font size=8>(rec. {recording_year})</font><br/>"
+                        else:
+                            year_line = f"<b>{recording_year}</b><br/>"
+
                         metadata_text = f"""
                         <b>{item['title']}</b><br/><br/>
+                        {year_line}
                         {item['artist']}<br/>
-                        <i>{item['album']} ({item['year']})</i><br/>
+                        <i>{item['album']}</i><br/>
                         {item['composer']}<br/>
                         {item['genre']}
                         """

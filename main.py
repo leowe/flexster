@@ -32,6 +32,19 @@ def parse_arguments():
         default=3, 
         help="Number of columns of cards per page (default: 3)."
     )
+    parser.add_argument(
+        "--platform", "-p",
+        type=str,
+        choices=["apple", "spotify"],
+        default="apple",
+        help="Music platform for QR codes: 'apple' for Apple Music or 'spotify' for Spotify (default: apple)."
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=str,
+        default="music_cards",
+        help="Output filename prefix for CSV and PDF files (default: music_cards). Will generate <name>.csv and <name>.pdf"
+    )
     return parser.parse_args()
 
 def main():
@@ -61,18 +74,21 @@ def main():
 
     if results:
         # Save to CSV
-        fetcher.save_to_csv(results)
+        csv_filename = f"{args.output}.csv"
+        fetcher.save_to_csv(results, filename=csv_filename)
 
         # Generate PDF
         logger.info("Generating PDF...")
         # Mirroring is True by default, so we pass False if --no-mirror is set
         mirror_metadata = not args.no_mirror
         
+        pdf_filename = f"{args.output}.pdf"
         pdf_gen = PDFGenerator(
-            "music_cards.pdf", 
+            pdf_filename, 
             mirror_metadata=mirror_metadata,
             rows=args.rows,
-            cols=args.cols
+            cols=args.cols,
+            platform=args.platform
         )
         pdf_gen.create_pdf(results)
         logger.info("PDF generation complete.")
